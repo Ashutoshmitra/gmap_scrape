@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Geocoder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Address Geocoder</h1>
+        <div class="upload-section">
+            <form id="uploadForm">
+                <div class="file-input-container">
+                    <input type="file" id="fileInput" accept=".xlsx" required>
+                    <label for="fileInput" class="file-label">Choose Excel File</label>
+                </div>
+                <button type="submit" id="uploadButton">Process Addresses</button>
+            </form>
+        </div>
+        
+        <div class="progress-section">
+            <h2>Processing Progress</h2>
+            <div id="progressLog" class="progress-log"></div>
+        </div>
+
+        <div id="downloadSection" class="download-section hidden">
+            <button id="downloadButton" class="download-button">Download Processed File</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
