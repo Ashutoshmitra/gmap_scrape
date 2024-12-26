@@ -1,0 +1,11 @@
+flask==3.0.0
+flask-socketio==5.3.6
+pandas==2.1.4
+selenium==4.15.2
+openpyxl==3.1.2
+python-engineio==4.8.0
+python-socketio==5.10.0
+werkzeug==3.0.1
+gunicorn==21.2.0
+eventlet==0.33.3
+tqdm==4.66.1
