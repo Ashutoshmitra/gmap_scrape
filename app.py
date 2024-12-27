@@ -23,7 +23,11 @@ def emit_progress(message):
 
 def setup_driver():
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
+    options.add_argument("--headless")  # Run in headless mode
+    options.add_argument("--no-sandbox")  # Required in container environments
+    options.add_argument("--disable-dev-shm-usage")  # Overcome limited /dev/shm space
+    options.add_argument("--disable-gpu")  # Disable GPU rendering (headless mode doesn't use it)
+    options.add_argument("--remote-debugging-port=9222")  # Debugging port for Chrome
     driver = webdriver.Chrome(options=options)
     return driver
 
