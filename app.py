@@ -10,6 +10,13 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 from io import BytesIO
+import logging
+
+CHROME_BINARY_LOCATION = os.getenv('CHROME_BINARY_LOCATION', '/usr/bin/chromium')
+CHROMEDRIVER_PATH = os.getenv('CHROMEDRIVER_PATH', '/usr/bin/chromedriver')
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -23,52 +30,81 @@ def emit_progress(message):
 
 def setup_driver():
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # Run in headless mode
-    options.add_argument("--no-sandbox")  # Required in container environments
-    options.add_argument("--disable-dev-shm-usage")  # Overcome limited /dev/shm space
-    options.add_argument("--disable-gpu")  # Disable GPU rendering (headless mode doesn't use it)
-    options.add_argument("--remote-debugging-port=9222")  # Debugging port for Chrome
-    driver = webdriver.Chrome(options=options)
-    return driver
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    # Add these additional options
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    # Set user agent to avoid detection
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
+    
+    return webdriver.Chrome(options=options)
 
 def get_lat_long_from_address(driver, address):
     try:
         driver.get(f"https://www.google.com/maps/place/{address}")
-        wait = WebDriverWait(driver, 3)
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "canvas")))
         
-        try:
-            close_button = driver.find_element(By.CSS_SELECTOR, "button.yra0jd.Hk4XGb")
-            close_button.click()
-            time.sleep(2)
-        except Exception as e:
-            emit_progress(f"Could not close side panel: {e}")
-
-        map_canvas = driver.find_element(By.CSS_SELECTOR, "canvas")
-        action = ActionChains(driver)
-        action.context_click(map_canvas).perform()
-        time.sleep(1)
-
-        lat_long_element = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "mLuXec")))
-        return lat_long_element.text
+        # Increase wait time
+        wait = WebDriverWait(driver, 10)
+        
+        # Wait for page load more explicitly
+        wait.until(lambda d: d.execute_script('return document.readyState') == 'complete')
+        
+        # Take screenshot for debugging if needed
+        driver.save_screenshot(f"debug_{address.replace(' ', '_')}.png")
+        
+        # Try multiple selectors for the coordinates
+        selectors = [
+            "button.yra0jd.Hk4XGb",
+            "div.mLuXec",
+            "div[role='menuitem']"
+        ]
+        
+        for selector in selectors:
+            try:
+                element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                if element.is_displayed():
+                    return element.text
+            except Exception as e:
+                emit_progress(f"Selector {selector} failed: {str(e)}")
+                continue
+                
+        raise Exception("Could not find coordinates with any selector")
 
     except Exception as e:
-        emit_progress(f"Error retrieving coordinates: {e}")
+        emit_progress(f"Detailed error for {address}: {str(e)}")
         return None
+    finally:
+        # Clear cookies and cache after each request
+        driver.delete_all_cookies()
+
 
 def process_excel_file(filepath):
     df = pd.read_excel(filepath)
-    driver = setup_driver()
+    try:
+        driver = setup_driver()
+        logger.info("Driver setup successful")
+    except Exception as e:
+        logger.error(f"Driver setup failed: {str(e)}")
+        raise
     
-    for index, row in df.iterrows():
-        address = row.get("Full Address", None)
-        if address:
-            emit_progress(f"Processing address: {address}")
-            lat_long = get_lat_long_from_address(driver, address)
-            df.at[index, 'Google Map Coordinates'] = lat_long
-
-    driver.quit()
+    try:
+        for index, row in df.iterrows():
+            address = row.get("Full Address", None)
+            if address:
+                logger.info(f"Processing address: {address}")
+                lat_long = get_lat_long_from_address(driver, address)
+                logger.info(f"Retrieved coordinates: {lat_long}")
+                df.at[index, 'Google Map Coordinates'] = lat_long
+    finally:
+        driver.quit()
+        
     return df
+
 
 @app.route('/')
 def index():
