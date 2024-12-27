@@ -27,18 +27,22 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Add these lines after the apt-get install
+# Copy application code
+COPY requirements.txt ./
+
+# Install Python packages BEFORE switching to chrome user
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create chrome user and set permissions AFTER pip install
 RUN addgroup --system chrome && \
     adduser --system --group chrome && \
     chown -R chrome:chrome /app
 
-# Set the user to run Chrome
-USER chrome
-
-# Copy application code
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the rest of the application code
 COPY . .
 
-# Update the CMD to run with proper permissions
+# Switch to chrome user
+USER chrome
+
+# Expose the Flask app on port 8080
 CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
